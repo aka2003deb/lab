@@ -19,9 +19,9 @@ int wn,yn; // intermediate and output values in each stage
 input = input_left_sample();
 for (section=0 ; section< NUM_SECTIONS ; section++)
 {
-wn = input - ((a[section][0]*w[section][0])&>>;15) - ((a[section][1]*w[section][1])&>>15);
-yn = ((b[section][0]*wn)&>>15) + ((b[section][1]*w[section][0])&>>15) +
-((b[section][2]*w[section][1])&>>15);
+wn = input - ((a[section][0]*w[section][0])>>15) - ((a[section][1]*w[section][1])>>15);
+yn = ((b[section][0]*wn)>>15) + ((b[section][1]*w[section][0])>>15) +
+((b[section][2]*w[section][1])>>15);
 w[section][1] = w[section][0];
 w[section][0] = wn;
 input = yn; // output of current section will be input to next
