@@ -124,10 +124,6 @@ stem(f_zero, s_unipolar_nrz(1), 'or', 'LineWidth', 2, 'MarkerSize', 8); % Impuls
 hold on;
 plot(f, s_unipolar_nrz, '-r', 'LineWidth', 2);
 
-% Manchester code
-s_manchester = (v^2 * T) * ((sin(pi * f * T/2) ./ (pi * f * T/2)).^2) .* (sin(pi * f * T/2).^2);
-plot(f, s_manchester, '--g', 'LineWidth', 2);
-
 % Polar NRZ
 s_polar_nrz = (v^2 * T) * (sin(pi * f * T) ./ (pi * f * T)).^2;
 plot(f, s_polar_nrz, '--b', 'LineWidth', 2);
@@ -135,6 +131,10 @@ plot(f, s_polar_nrz, '--b', 'LineWidth', 2);
 % Bipolar RZ
 s_bipolar_rz = (v^2 * T/4) * ((sin(pi * f * T/2) ./ (pi * f * T/2)).^2) .* (sin(pi * f * T).^2);
 plot(f, s_bipolar_rz, '--k', 'LineWidth', 2);
+
+% Manchester code
+s_manchester = (v^2 * T) * ((sin(pi * f * T/2) ./ (pi * f * T/2)).^2) .* (sin(pi * f * T/2).^2);
+plot(f, s_manchester, '--g', 'LineWidth', 2);
 
 legend('Unipolar NRZ: impulse at f=0', 'Unipolar NRZ', 'Manchester code', 'Polar NRZ', 'Bipolar RZ / RZ-AMI');
 xlabel('Normalized frequency');
