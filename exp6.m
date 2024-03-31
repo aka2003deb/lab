@@ -100,3 +100,37 @@ function [ADMout] = adeltamod(sig_in, Delta, td, ts)
  end
  end
 end
+%adaptive delta modulation alternative
+function ADMout = adeltamod(sig_in, Delta, td, ts)
+    Nfac = round(ts/td);
+    xsig = downsample(sig_in, Nfac);
+    ADMout = zeros(size(sig_in));
+    sum = 0;
+    cnt1 = 0;
+    cnt2 = 0;
+    
+    for i = 1:length(xsig)
+        if xsig(i) > sum
+            step = Delta * 2^(min(3, cnt1));
+            sum = sum + step;
+            cnt1 = cnt1 + (sum < xsig(i));
+            cnt2 = 0;
+        elseif xsig(i) < sum
+            step = Delta * 2^(min(3, cnt2));
+            sum = max(0, sum - step);
+            cnt1 = 0;
+            cnt2 = cnt2 + (sum > xsig(i));
+        end
+        ADMout(((i-1)*Nfac + 1):(i*Nfac)) = sum;
+    end
+end
+
+% Example usage
+td = 0.01;
+ts = 0.02;
+t = 0:td:(5-td); % Adjusted to match the length of ADMout
+x = 8*sin(2*pi*t);
+delta = 0.1;
+
+ADMout = adeltamod(x, delta, td, ts);
+plot(t, 9*sin(2*pi*t), '-', t, x, 'red');
