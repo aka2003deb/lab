@@ -2,11 +2,8 @@ clc
 clear all
 close all
 t = -5:0.01:5; %basic time axis
-f =2;
-w = 2*pi*f;
-osr = 250; %can vary
-fs1 = w/pi;
-fs = fs1*osr;
+w = 4*pi;
+fs = 1000;
 %% sampling time
 ts = -5:(1/fs):5; %sampling times are defined
 y = @(t)sin(w.*t); %signal is defined
