@@ -36,31 +36,67 @@ title('DELTA MODULATION')
 
 % adaptive delta modulation
 
-clc;
-close all;
-clear all;
+close all
+clear all
+clc
+td = 0.01;
+ts = 0.02;
+t = 0:td:5;
+x = 8*sin(2*pi*t);
+delta = 0.1;
+figure(1)
+ADMout = adeltamod(x,delta,td,ts);
+figure(2)
+plot(t,ADMout,'-',t,x,'red');
+function [ADMout] = adeltamod(sig_in, Delta, td, ts)
+ if (round(ts/td) >= 2)
+ Nfac = round(ts/td); %Nearest integer
+ xsig = downsample(sig_in,Nfac);
+ Lxsig = length(xsig);
+ Lsig_in = length(sig_in);
 
-td=0.002;
-t=[0:td:1];
-xsig=sin(2*pi*t)-sin(6*pi*t);
-ts=0.2;
-delta=0.2*8;
-Lsig=length(xsig);
-if(rem(ts/td,1)==0)
-    nfac=round(ts/td);
-    p_zoh=ones(1,nfac);
-    s_down=downsample(xsig,nfac);
-    Num_it=length(s_down);
-    s_DMout(1)=delta/2;
-    for k=2:Num_it
-        xvar=s_DMout(k-1);
-        s_DMout(k)=xvar+delta*sign(s_down(k-1)-xvar);
-    end
-    S_DMout=kron(s_DMout,p_zoh);
-else
-    S_DMout=[];
+ ADMout = zeros(Lsig_in); %Initialising output
+
+ cnt1 = 0; %Counters for no. of previous consecutively increasing
+ cnt2 = 0; %steps
+ sum = 0;
+ for i=1:Lxsig
+
+ if (xsig(i) == sum)
+ elseif (xsig(i) > sum)
+ if (cnt1 < 2)
+ sum = sum + Delta; %Step up by Delta, same as in DM
+ elseif (cnt1 == 2)
+ sum = sum + 2*Delta; %Double the step size after
+ %first two increase
+ elseif (cnt1 == 3)
+ sum = sum + 4*Delta; %Double step size
+ else
+ sum = sum + 8*Delta; %Still double and then stop
+ %doubling thereon
+ end
+ if (sum < xsig(i))
+ cnt1 = cnt1 + 1;
+ else
+ cnt1 = 0;
+ end
+ else
+ if (cnt2 < 2)
+ sum = sum - Delta;
+ elseif (cnt2 == 2)
+ sum = sum - 2*Delta;
+ elseif (cnt2 == 3)
+ sum = sum - 4*Delta;
+ else
+ sum = sum - 8*Delta;
+ end
+ if (sum > xsig(i))
+ cnt2 = cnt2 + 1;
+ else
+ cnt2 = 0;
+ end
+ end
+ ADMout(((i-1)*Nfac + 1):(i*Nfac)) = sum;
+ end
+ end
 end
-
-figure(1);
-sfig1=plot(t,xsig,'k',t,S_DMout(1:Lsig),'b');
-set(sfig1,'LineWidth',2);
