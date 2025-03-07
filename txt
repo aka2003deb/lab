@@ -1,0 +1,2 @@
+c++ code (usinf namespace std) for finding the exact memory loaction..and which part of memeory is exaclty the variable is stored and also expalin properly for eg if a varibale is locally declared in a function it should print as stack..and so on..wrire the code accorindgly by using the concept of various ranges of adresses
+write the code for all posiible memory parts stack,heap,data segment(.bss) etc
