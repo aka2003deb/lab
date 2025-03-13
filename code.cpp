@@ -1,76 +1,78 @@
-#include <iostream>
 #include <windows.h>
-using namespace std;
+#include <iostream>
 
-// Function to determine the memory segment based on the address
+// Function that attempts to classify the memory segment of a given address.
 const char* getMemorySegment(const void* address) {
-    // Get system information to determine memory ranges
-    SYSTEM_INFO sysInfo;
-    GetSystemInfo(&sysInfo);
-
-    // Convert the address to a uintptr_t for comparison
-    uintptr_t addr = reinterpret_cast<uintptr_t>(address);
-
-    // Typical memory ranges for 64-bit Windows
-    uintptr_t codeStart = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr)); // Start of code segment
-    uintptr_t codeEnd = codeStart + 0x100000; // Approximate end of code segment (1 MB)
-    uintptr_t dataStart = codeEnd; // Start of initialized data segment
-    uintptr_t dataEnd = dataStart + 0x100000; // Approximate end of initialized data segment (1 MB)
-    uintptr_t bssStart = dataEnd; // Start of BSS segment
-    uintptr_t bssEnd = bssStart + 0x100000; // Approximate end of BSS segment (1 MB)
-    uintptr_t rodataStart = bssEnd; // Start of read-only data segment
-    uintptr_t rodataEnd = rodataStart + 0x100000; // Approximate end of read-only data segment (1 MB)
-    uintptr_t heapStart = reinterpret_cast<uintptr_t>(GetProcessHeap()); // Start of heap segment
-    uintptr_t heapEnd = heapStart + 0x10000000; // Approximate end of heap segment (256 MB)
-
-    // Approximate stack start using the address of a local variable in the main function
-    int stackVar;
-    uintptr_t stackStart = reinterpret_cast<uintptr_t>(&stackVar); // Approximate start of stack segment
-    uintptr_t stackEnd = static_cast<uintptr_t>(0x7FFFFFFFFFFF); // End of stack segment (top of user-mode address space)
-
-    // Determine the memory segment
-    if (addr >= codeStart && addr < codeEnd) {
-        return "Code Segment";
-    } else if (addr >= dataStart && addr < dataEnd) {
-        return "Initialized Data Segment";
-    } else if (addr >= bssStart && addr < bssEnd) {
-        return "Uninitialized Data Segment (BSS)";
-    } else if (addr >= rodataStart && addr < rodataEnd) {
-        return "Read-Only Data Segment";
-    } else if (addr >= heapStart && addr < heapEnd) {
-        return "Heap Segment";
-    } else if (addr >= stackStart && addr <= stackEnd) {
-        return "Stack Segment";
-    } else {
-        return "Unknown Segment";
+    MEMORY_BASIC_INFORMATION mbi;
+    if (VirtualQuery(address, &mbi, sizeof(mbi)) == 0) {
+        return "Unknown (VirtualQuery failed)";
     }
+
+    // Try to get the stack boundaries (available on Windows 8 and later)
+    ULONG_PTR stackLow = 0, stackHigh = 0;
+    typedef void(WINAPI * GetCurrentThreadStackLimits_t)(PULONG_PTR, PULONG_PTR);
+    HMODULE hKernel32 = GetModuleHandle(TEXT("kernel32.dll"));
+    if (hKernel32) {
+        GetCurrentThreadStackLimits_t pGetCurrentThreadStackLimits =
+            (GetCurrentThreadStackLimits_t)GetProcAddress(hKernel32, "GetCurrentThreadStackLimits");
+        if (pGetCurrentThreadStackLimits) {
+            pGetCurrentThreadStackLimits(&stackLow, &stackHigh);
+            // Check if the address falls within the stack boundaries.
+            if ((ULONG_PTR)address >= stackLow && (ULONG_PTR)address <= stackHigh)
+                return "Stack Segment";
+        }
+    }
+    
+    // If the region belongs to the image (the executable module)...
+    if (mbi.Type == MEM_IMAGE) {
+        // Use protection flags to guess if it is code or data.
+        if (mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
+            return "Code Segment";
+        else
+            return "Data Segment (part of the executable image)";
+    }
+    
+    // If it is private memory, most likely from a heap allocation.
+    if (mbi.Type == MEM_PRIVATE) {
+        return "Heap Segment";
+    }
+
+    return "Unknown Segment";
 }
 
+//
+// Example usage:
+//  - A local variable (should be on the stack)
+//  - A heap variable (allocated with new)
+//  - A global variable (in the image)
+//
+int globalData = 123;    // Global initialized variable (Data Segment)
+static int globalBSS;    // Global uninitialized variable (BSS, but part of the image)
+
 int main() {
-    // Stack Segment: Local variable
-    int stackVar = 42;
-    cout << "Address of stackVar: " << &stackVar << " and it lies in " << getMemorySegment(&stackVar) << endl;
+    // Local (stack) variable
+    int localVar = 42;
+    std::cout << "Address of localVar: " << &localVar 
+              << " -> " << getMemorySegment(&localVar) << "\n";
 
-    // Heap Segment: Dynamically allocated variable using 'new'
-    int* heapVar = new int(100); // Allocate memory using 'new'
-    cout << "Address of heapVar: " << heapVar << " and it lies in " << getMemorySegment(heapVar) << endl;
-    delete heapVar; // Free memory using 'delete'
+    // Dynamically allocated (heap) variable
+    int* heapVar = new int(100);
+    std::cout << "Address of heapVar: " << heapVar 
+              << " -> " << getMemorySegment(heapVar) << "\n";
+    delete heapVar;
 
-    // Initialized Data Segment: Global initialized variable
-    static int dataVar = 200;
-    cout << "Address of dataVar: " << &dataVar << " and it lies in " << getMemorySegment(&dataVar) << endl;
+    // Global initialized variable
+    std::cout << "Address of globalData: " << &globalData 
+              << " -> " << getMemorySegment(&globalData) << "\n";
 
-    // Uninitialized Data Segment (BSS): Global uninitialized variable
-    static int bssVar;
-    cout << "Address of bssVar: " << &bssVar << " and it lies in " << getMemorySegment(&bssVar) << endl;
+    // Global uninitialized variable (BSS)
+    std::cout << "Address of globalBSS: " << &globalBSS 
+              << " -> " << getMemorySegment(&globalBSS) << "\n";
 
-    // Read-Only Data Segment: Constant variable
-    const char* rodataVar = "This is a read-only string";
-    cout << "Address of rodataVar: " << reinterpret_cast<const void*>(rodataVar) << " and it lies in " << getMemorySegment(reinterpret_cast<const void*>(rodataVar)) << endl;
-
-    // Code Segment: Function address
-    void (*codeVar)() = []() { cout << "Code Segment Function" << endl; };
-    cout << "Address of codeVar: " << reinterpret_cast<void*>(codeVar) << " and it lies in " << getMemorySegment(reinterpret_cast<void*>(codeVar)) << endl;
+    // Function pointer (code segment)
+    void (*funcPtr)() = []() { std::cout << "Inside function.\n"; };
+    std::cout << "Address of funcPtr: " << reinterpret_cast<void*>(funcPtr)
+              << " -> " << getMemorySegment(reinterpret_cast<void*>(funcPtr)) << "\n";
 
     return 0;
 }
